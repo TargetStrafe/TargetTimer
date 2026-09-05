@@ -9,6 +9,44 @@ namespace TargetTimer
     {
         private const string RegistryRunPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
         private const string AppName = "TargetTimer";
+        private static readonly string SettingsFile = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "TargetTimer",
+            "settings.json"
+        );
+
+        public static event Action<bool> OnAutostartChanged;
+        public static bool WasFirstRun { get; private set; }
+
+        public static void InitializeOnFirstRun()
+        {
+            try
+            {
+                string dir = Path.GetDirectoryName(SettingsFile);
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+                if (!File.Exists(SettingsFile))
+                {
+                    WasFirstRun = true;
+                    SetAutostart(true);
+                }
+                else
+                {
+                    string content = File.ReadAllText(SettingsFile);
+                    bool userWantsAutostart = content.IndexOf("\"autostart\": true", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                              content.IndexOf("\"autostart\":true", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                    if (userWantsAutostart)
+                    {
+                        if (!IsAutostartEnabled())
+                        {
+                            SetAutostart(true);
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
 
         public static bool IsAutostartEnabled()
         {
@@ -49,13 +87,37 @@ namespace TargetTimer
                             key.DeleteValue(AppName, false);
                         }
                     }
-                    return true;
                 }
+
+                SaveAutostartSetting(enable);
+
+                if (OnAutostartChanged != null)
+                {
+                    OnAutostartChanged(enable);
+                }
+
+                return true;
             }
             catch
             {
                 return false;
             }
+        }
+
+        private static void SaveAutostartSetting(bool enabled)
+        {
+            try
+            {
+                string dir = Path.GetDirectoryName(SettingsFile);
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+                string json = "{\r\n" +
+                              "  \"first_run\": false,\r\n" +
+                              "  \"autostart\": " + (enabled ? "true" : "false") + "\r\n" +
+                              "}";
+                File.WriteAllText(SettingsFile, json);
+            }
+            catch { }
         }
     }
 }

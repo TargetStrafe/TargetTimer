@@ -471,7 +471,23 @@ namespace TargetTimer
             };
             _chkAutostart.CheckedChanged += (s, e) =>
             {
-                AutostartManager.SetAutostart(_chkAutostart.Checked);
+                if (AutostartManager.IsAutostartEnabled() != _chkAutostart.Checked)
+                {
+                    AutostartManager.SetAutostart(_chkAutostart.Checked);
+                }
+            };
+            AutostartManager.OnAutostartChanged += (enabled) =>
+            {
+                if (this.IsHandleCreated && !this.IsDisposed)
+                {
+                    this.BeginInvoke(new Action(() =>
+                    {
+                        if (_chkAutostart != null && _chkAutostart.Checked != enabled)
+                        {
+                            _chkAutostart.Checked = enabled;
+                        }
+                    }));
+                }
             };
 
             _chkMinimizeOnClose = new CheckBox

@@ -128,6 +128,8 @@ namespace TargetTimer
 
         private static void InitializeApp(bool startSilent)
         {
+            AutostartManager.InitializeOnFirstRun();
+
             _storage = new StorageManager();
             _engine = new TrackerEngine(_storage);
             _mainWindow = new MainWindow(_storage, _engine, ExitApplication);
@@ -159,11 +161,17 @@ namespace TargetTimer
             _autostartMenuItem = new ToolStripMenuItem("⚙️ Автозапуск с Windows", null, (s, e) =>
             {
                 bool current = AutostartManager.IsAutostartEnabled();
-                bool target = !current;
-                AutostartManager.SetAutostart(target);
-                _autostartMenuItem.Checked = target;
+                AutostartManager.SetAutostart(!current);
             });
             _autostartMenuItem.Checked = AutostartManager.IsAutostartEnabled();
+
+            AutostartManager.OnAutostartChanged += (enabled) =>
+            {
+                if (_autostartMenuItem != null)
+                {
+                    _autostartMenuItem.Checked = enabled;
+                }
+            };
 
             var updateItem = new ToolStripMenuItem("🔄 Обновления (v" + UpdateManager.CurrentVersion + ")", null, (s, e) =>
             {
@@ -195,6 +203,11 @@ namespace TargetTimer
             {
                 ShowMainWindow();
             };
+
+            if (AutostartManager.WasFirstRun)
+            {
+                _trayIcon.ShowBalloonTip(4000, "TargetTimer", "TargetTimer автоматически добавлен в автозапуск с Windows (в фоне). Отключить можно в Настройках или трее.", ToolTipIcon.Info);
+            }
 
             _engine.Start();
             UpdateManager.InitAutoUpdate();
