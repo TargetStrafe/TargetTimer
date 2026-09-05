@@ -25,9 +25,6 @@ namespace TargetTimer
         private static System.Windows.Forms.Timer _memoryTrimTimer;
         private static ToolStripMenuItem _autostartMenuItem;
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool SetProcessWorkingSetSize(IntPtr proc, int min, int max);
-
         [STAThread]
         static void Main(string[] args)
         {
@@ -232,13 +229,10 @@ namespace TargetTimer
             }
 
             _memoryTrimTimer = new System.Windows.Forms.Timer();
-            _memoryTrimTimer.Interval = 45000;
+            _memoryTrimTimer.Interval = 15000;
             _memoryTrimTimer.Tick += (s, e) =>
             {
-                if (_mainWindow == null || !_mainWindow.Visible)
-                {
-                    TrimWorkingSet();
-                }
+                TrimWorkingSet();
             };
             _memoryTrimTimer.Start();
 
@@ -264,6 +258,7 @@ namespace TargetTimer
         {
             try
             {
+
                 if (_mainWindow != null && !_mainWindow.IsDisposed)
                 {
                     _mainWindow.ForceClose();
@@ -277,12 +272,15 @@ namespace TargetTimer
             catch { }
         }
 
-        private static void TrimWorkingSet()
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetProcessWorkingSetSize(IntPtr proc, IntPtr min, IntPtr max);
+
+        public static void TrimWorkingSet()
         {
             try
             {
                 GC.Collect(0, GCCollectionMode.Optimized);
-                SetProcessWorkingSetSize(Process.GetCurrentProcess().Handle, -1, -1);
+                SetProcessWorkingSetSize(Process.GetCurrentProcess().Handle, new IntPtr(-1), new IntPtr(-1));
             }
             catch { }
         }

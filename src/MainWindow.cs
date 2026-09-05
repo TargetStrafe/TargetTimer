@@ -702,6 +702,11 @@ namespace TargetTimer
             {
                 RefreshData(false);
             }
+
+            if (_refreshTickCount % 10 == 0)
+            {
+                TrimMemory();
+            }
         }
 
         private void UpdateMetricsQuick()
@@ -899,13 +904,13 @@ namespace TargetTimer
             try
             {
                 GC.Collect(0, GCCollectionMode.Optimized);
-                SetProcessWorkingSetSize(Process.GetCurrentProcess().Handle, -1, -1);
+                SetProcessWorkingSetSize(Process.GetCurrentProcess().Handle, new IntPtr(-1), new IntPtr(-1));
             }
             catch { }
         }
 
-        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
-        private static extern bool SetProcessWorkingSetSize(IntPtr proc, int min, int max);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetProcessWorkingSetSize(IntPtr proc, IntPtr min, IntPtr max);
 
         private static string FormatDuration(int seconds)
         {
@@ -976,6 +981,20 @@ namespace TargetTimer
             return btn;
         }
 
+        private static readonly SolidBrush _brushHeader = new SolidBrush(Color.FromArgb(28, 34, 50));
+        private static readonly Pen _penHeaderLine = new Pen(Color.FromArgb(40, 48, 72));
+        private static readonly SolidBrush _brushHeaderText = new SolidBrush(Color.FromArgb(140, 150, 170));
+        private static readonly SolidBrush _brushRowEven = new SolidBrush(Color.FromArgb(20, 24, 36));
+        private static readonly SolidBrush _brushRowOdd = new SolidBrush(Color.FromArgb(24, 28, 42));
+        private static readonly SolidBrush _brushRowSelected = new SolidBrush(Color.FromArgb(38, 46, 70));
+        private static readonly SolidBrush _brushTrack = new SolidBrush(Color.FromArgb(32, 38, 55));
+        private static readonly SolidBrush _brushBarFill = new SolidBrush(Color.FromArgb(106, 20, 255));
+        private static readonly SolidBrush _brushPctText = new SolidBrush(Color.FromArgb(180, 190, 210));
+        private static readonly SolidBrush _brushCol0 = new SolidBrush(Color.FromArgb(245, 247, 250));
+        private static readonly SolidBrush _brushCol1 = new SolidBrush(Color.FromArgb(140, 150, 170));
+        private static readonly StringFormat _sfNear = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Near, Trimming = StringTrimming.EllipsisCharacter };
+        private static readonly StringFormat _sfFar = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Far };
+
         private ListView CreateStyledListView(string[] headers, int[] widths)
         {
             var lv = new ListView
@@ -996,20 +1015,10 @@ namespace TargetTimer
 
             lv.DrawColumnHeader += (s, e) =>
             {
-                using (var brush = new SolidBrush(Color.FromArgb(28, 34, 50)))
-                {
-                    e.Graphics.FillRectangle(brush, e.Bounds);
-                }
-                using (var pen = new Pen(Color.FromArgb(40, 48, 72)))
-                {
-                    e.Graphics.DrawLine(pen, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
-                }
-                using (var textBrush = new SolidBrush(Color.FromArgb(140, 150, 170)))
-                {
-                    var sf = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Near };
-                    var textRect = new Rectangle(e.Bounds.Left + 6, e.Bounds.Top, e.Bounds.Width - 12, e.Bounds.Height);
-                    e.Graphics.DrawString(e.Header.Text, new Font("Segoe UI", 8.5f, FontStyle.Bold), textBrush, textRect, sf);
-                }
+                e.Graphics.FillRectangle(_brushHeader, e.Bounds);
+                e.Graphics.DrawLine(_penHeaderLine, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+                var textRect = new Rectangle(e.Bounds.Left + 6, e.Bounds.Top, e.Bounds.Width - 12, e.Bounds.Height);
+                e.Graphics.DrawString(e.Header.Text, new Font("Segoe UI", 8.5f, FontStyle.Bold), _brushHeaderText, textRect, _sfNear);
             };
 
             lv.DrawItem += (s, e) =>
@@ -1020,12 +1029,8 @@ namespace TargetTimer
             lv.DrawSubItem += (s, e) =>
             {
                 bool isSelected = e.Item.Selected;
-                Color rowBg = isSelected ? Color.FromArgb(38, 46, 70) : (e.ItemIndex % 2 == 0 ? Color.FromArgb(20, 24, 36) : Color.FromArgb(24, 28, 42));
-
-                using (var bgBrush = new SolidBrush(rowBg))
-                {
-                    e.Graphics.FillRectangle(bgBrush, e.Bounds);
-                }
+                Brush bgBrush = isSelected ? _brushRowSelected : (e.ItemIndex % 2 == 0 ? _brushRowEven : _brushRowOdd);
+                e.Graphics.FillRectangle(bgBrush, e.Bounds);
 
                 if (e.ColumnIndex == 2 && e.Item.Tag is double)
                 {
@@ -1035,39 +1040,21 @@ namespace TargetTimer
                     int barH = 8;
                     int barY = e.Bounds.Top + (e.Bounds.Height - barH) / 2;
 
-                    using (var trackBrush = new SolidBrush(Color.FromArgb(32, 38, 55)))
-                    {
-                        e.Graphics.FillRectangle(trackBrush, e.Bounds.Left + 6, barY, barMaxWidth, barH);
-                    }
+                    e.Graphics.FillRectangle(_brushTrack, e.Bounds.Left + 6, barY, barMaxWidth, barH);
 
                     if (barW > 0)
                     {
-                        using (var grad = new LinearGradientBrush(
-                            new Rectangle(e.Bounds.Left + 6, barY, Math.Max(barW, 10), barH),
-                            Color.FromArgb(106, 20, 255),
-                            Color.FromArgb(68, 240, 255),
-                            LinearGradientMode.Horizontal))
-                        {
-                            e.Graphics.FillRectangle(grad, e.Bounds.Left + 6, barY, barW, barH);
-                        }
+                        e.Graphics.FillRectangle(_brushBarFill, e.Bounds.Left + 6, barY, barW, barH);
                     }
 
-                    using (var textBrush = new SolidBrush(Color.FromArgb(180, 190, 210)))
-                    {
-                        var textRect = new Rectangle(e.Bounds.Left + barMaxWidth + 10, e.Bounds.Top, 44, e.Bounds.Height);
-                        var sf = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Far };
-                        e.Graphics.DrawString(string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.0}%", pct), new Font("Segoe UI", 8f), textBrush, textRect, sf);
-                    }
+                    var textRect = new Rectangle(e.Bounds.Left + barMaxWidth + 10, e.Bounds.Top, 44, e.Bounds.Height);
+                    e.Graphics.DrawString(string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.0}%", pct), new Font("Segoe UI", 8f), _brushPctText, textRect, _sfFar);
                 }
                 else
                 {
-                    Color textColor = (e.ColumnIndex == 0) ? Color.FromArgb(245, 247, 250) : Color.FromArgb(140, 150, 170);
-                    using (var textBrush = new SolidBrush(textColor))
-                    {
-                        var sf = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Near, Trimming = StringTrimming.EllipsisCharacter };
-                        var textRect = new Rectangle(e.Bounds.Left + 6, e.Bounds.Top, e.Bounds.Width - 12, e.Bounds.Height);
-                        e.Graphics.DrawString(e.SubItem.Text, lv.Font, textBrush, textRect, sf);
-                    }
+                    Brush textBrush = (e.ColumnIndex == 0) ? _brushCol0 : _brushCol1;
+                    var textRect = new Rectangle(e.Bounds.Left + 6, e.Bounds.Top, e.Bounds.Width - 12, e.Bounds.Height);
+                    e.Graphics.DrawString(e.SubItem.Text, lv.Font, textBrush, textRect, _sfNear);
                 }
             };
 
