@@ -1,0 +1,10 @@
+*.log
+*.tmp
+data/
+reports/
+.vs/
+bin/
+obj/
+*.suo
+*.user
+targettimer_gui_*.png

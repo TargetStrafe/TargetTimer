@@ -1,0 +1,5 @@
+{
+  "version": "1.0.0",
+  "download_url": "https://github.com/TargetStrafe/TargetTimer/releases/latest/download/TargetTimer.exe",
+  "changelog": "Initial release with low RAM footprint and anti-bloat disk protection."
+}
